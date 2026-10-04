@@ -19,8 +19,7 @@ MODULE_VERSION("1.0");
 #define STUDENT_NAME    "Hoang Trung Hai"
 #define STUDENT_ID      "SS204779"
 static int    major_number = DRIVER_MAJOR;
-static char   device_buffer[BUFFER_SIZE];
-static char driver_status[int_max_len] = "idle"; 
+static char   device_buffer[BUFFER_SIZE]; 
 static int    buffer_len = 0;
 static int    open_count = 0;
 static struct class  *lab2_class  = NULL;
