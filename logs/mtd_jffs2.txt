@@ -1,0 +1,51 @@
+=== LAB-02: NAND SIMULATOR + JFFS2 TEST ===
+
+=== 1. NAND simulator / MTD ===
+dev:    size   erasesize  name
+mtd0: 02000000 00001000 "BIOS"
+mtd1: 02000000 00004000 "NAND simulator partition 0"
+
+=== 2. MTD device nodes ===
+crw------- 1 root root 90, 0 Oct  5 09:11 /dev/mtd0
+crw------- 1 root root 90, 1 Oct  5 09:11 /dev/mtd0ro
+crw------- 1 root root 90, 2 Oct  5 09:54 /dev/mtd1
+crw------- 1 root root 90, 3 Oct  5 09:54 /dev/mtd1ro
+brw-rw-rw- 1 root root 31, 1 Oct  5 09:55 /dev/mtdblock1
+
+/dev/mtd:
+total 0
+drwxr-xr-x 2 root root 80 Oct  5 09:54 by-name
+
+=== 3. JFFS2 mount ===
+/dev/mtdblock1 on /mnt/jffs2 type jffs2 (rw,relatime)
+
+=== 4. JFFS2 directory ===
+total 5.5K
+drwxr-xr-x 3 root root    0 Jan  1  1970 .
+drwxr-xr-x 3 root root 4.0K Sep 30 08:19 ..
+-rw-r--r-- 1 root root   32 Oct  5 09:56 boot.log
+-rw-r--r-- 1 root root   18 Oct  5 09:56 hello.txt
+-rw-r--r-- 1 root root   20 Oct  5 09:56 info.txt
+
+=== 5. JFFS2 file contents ===
+--- hello.txt ---
+Hello from JFFS2!
+--- info.txt ---
+Embedded Linux Lab2
+--- boot.log ---
+Mon Oct  5 09:56:42 AM +07 2026
+
+=== 6. NAND dump ===
+ECC failed: 0
+ECC corrected: 0
+Number of bad blocks: 0
+Number of bbt blocks: 0
+Block size 16384, page size 512, OOB size 16
+Dumping data starting at 0x00000000 and ending at 0x00000200...
+
+[Raw NAND payload omitted from text log; full dump: /tmp/dump.bin]
+
+=== 7. Dump file ===
+-rw-r--r-- 1 root root 528 /tmp/dump.bin
+
+=== JFFS2 TEST PASSED ===
