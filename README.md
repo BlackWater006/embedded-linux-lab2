@@ -3,265 +3,211 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Architecture-ARMv7-blue?style=for-the-badge" alt="ARMv7">
   <img src="https://img.shields.io/badge/Linux-5.15-orange?style=for-the-badge" alt="Linux 5.15">
-  <img src="https://img.shields.io/badge/Driver-Character_Device-green?style=for-the-badge" alt="Character Device Driver">
-  <img src="https://img.shields.io/badge/ProcFS-SysFS-purple?style=for-the-badge" alt="ProcFS and SysFS">
-  <img src="https://img.shields.io/badge/QEMU-vexpress--a9-red?style=for-the-badge" alt="QEMU vexpress-a9">
-  <img src="https://img.shields.io/badge/JFFS2-MTD-yellow?style=for-the-badge" alt="JFFS2 MTD">
+  <img src="https://img.shields.io/badge/QEMU-VExpress--A9-green?style=for-the-badge" alt="QEMU VExpress-A9">
+  <img src="https://img.shields.io/badge/Character--Device-Driver-purple?style=for-the-badge" alt="Character Device Driver">
+  <img src="https://img.shields.io/badge/ProcFS%20%2F%20SysFS-Validated-red?style=for-the-badge" alt="ProcFS SysFS">
+  <img src="https://img.shields.io/badge/JFFS2%20%2F%20MTD-Tested-yellow?style=for-the-badge" alt="JFFS2 MTD">
 </p>
 
 <p align="center">
-  <b>Linux Kernel Driver Development on an ARMv7 Embedded Linux Platform.</b>
-</p>
-
-<p align="center">
-  Character Device · Kernel Module · ProcFS · SysFS · BusyBox · Initramfs · QEMU · MTD · NAND · JFFS2
+  <b>Embedded Linux Lab 2 — Character Device Driver, ProcFS, SysFS, Initramfs, MTD and JFFS2</b>
 </p>
 
 ---
 
-## Overview
+## 1. Overview
 
-This repository contains the implementation of **Embedded Linux Lab 2**, focusing on Linux kernel module development and low-level device interfaces in an ARMv7 Embedded Linux environment.
+This project implements and validates a Linux character device driver on an ARMv7 Embedded Linux environment.
 
-The project extends the minimal Linux system developed in Lab 1 by introducing a custom **character device driver**, runtime driver interfaces through **ProcFS and SysFS**, and an experimental **MTD/NAND/JFFS2 storage environment**.
+The project extends the Embedded Linux Lab 1 platform by introducing:
 
-The driver is cross-compiled for ARMv7, integrated into a BusyBox-based initramfs, and executed on the QEMU `vexpress-a9` virtual platform.
+* A custom Linux character device driver
+* `/dev/lab2` character device
+* ProcFS interface
+* SysFS attributes
+* Kernel module integration into Initramfs
+* Automatic driver loading during boot
+* QEMU VExpress-A9 execution
+* NAND simulator and MTD validation
+* JFFS2 filesystem validation
+* NAND raw data dump verification
+* Runtime test logs and reproducibility evidence
 
-The complete workflow is:
-
-```text
-Linux Kernel 5.15
-        +
-ARMv7 Cross Compilation
-        +
-LAB-02 Kernel Module
-        +
-BusyBox Initramfs
-        ↓
-QEMU ARM Cortex-A9
-        ↓
-Character Device
-/dev/lab2
-        ↓
-ProcFS + SysFS
-        ↓
-Runtime Driver Verification
-```
-
-The laboratory also explores:
-
-```text
-NAND Simulator
-      ↓
-MTD Subsystem
-      ↓
-JFFS2 Filesystem
-      ↓
-Mount / Write / Persistence
-      ↓
-NAND Dump Verification
-```
+The complete system is cross-compiled on Ubuntu and executed on an ARMv7 Cortex-A9 virtual platform using QEMU.
 
 ---
 
-## Architecture
+## 2. Lab Environment
 
-The project follows a Linux kernel driver architecture in which userspace interacts with the custom kernel module through multiple kernel interfaces.
-
-```mermaid
-flowchart TB
-
-    subgraph USER["USER SPACE"]
-        A["BusyBox Shell<br/><b>/bin/sh</b>"]
-        B["Test Scripts<br/><br/>test_driver.sh<br/>test_procfs.sh"]
-        C["Character Device<br/><b>/dev/lab2</b>"]
-    end
-
-    subgraph KERNEL["KERNEL SPACE"]
-        D["Linux Kernel 5.15<br/><br/>ARMv7"]
-        E["LAB-02 Character Driver<br/><b>lab2_driver.ko</b>"]
-        F["ProcFS<br/><b>/proc/lab2_info</b>"]
-        G["SysFS<br/><b>/sys/class/lab2_class/lab2</b>"]
-    end
-
-    subgraph PLATFORM["VIRTUAL PLATFORM"]
-        H["QEMU<br/><b>vexpress-a9</b>"]
-        I["ARM Cortex-A9"]
-        J["Device Tree<br/><b>vexpress-v2p-ca9.dtb</b>"]
-    end
-
-    A --> B
-    B --> C
-    C --> E
-    F --> B
-    G --> B
-    E --> F
-    E --> G
-    H --> D
-    I --> H
-    J --> D
-    D --> E
-```
+| Component           | Configuration             |
+| ------------------- | ------------------------- |
+| Host OS             | Ubuntu 26.04 LTS 64-bit   |
+| Target Architecture | ARMv7                     |
+| CPU                 | ARM Cortex-A9             |
+| Kernel              | Linux 5.15                |
+| Machine             | QEMU VExpress-A9          |
+| RAM                 | 512 MB                    |
+| SMP                 | 2 CPUs                    |
+| Cross Compiler      | `arm-linux-gnueabihf-gcc` |
+| Root Filesystem     | BusyBox Initramfs         |
+| Character Device    | `/dev/lab2`               |
+| Major Number        | 240                       |
+| Buffer Size         | 1024 bytes                |
+| Filesystem          | JFFS2                     |
+| Flash Interface     | MTD / NAND Simulator      |
 
 ---
 
-## Driver Data Flow
+## 3. Project Objectives
 
-The character device uses an in-kernel buffer protected by a mutex.
+The main objectives of this laboratory are:
 
-```mermaid
-flowchart LR
-
-    A["Userspace<br/>echo / cat"]
-    B["/dev/lab2"]
-    C["lab2_driver.ko"]
-    D["Mutex"]
-    E["Device Buffer<br/>1024 bytes"]
-    F["ProcFS"]
-    G["SysFS"]
-    H["Kernel Log<br/>dmesg"]
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    E --> G
-    C --> H
-```
-
-The same internal driver state can therefore be inspected through:
-
-```text
-/dev/lab2
-/proc/lab2_info
-/sys/class/lab2_class/lab2/*
-dmesg
-```
+1. Implement a Linux character device driver.
+2. Register and create `/dev/lab2`.
+3. Implement `open()`, `read()`, `write()` and `release()`.
+4. Maintain driver runtime statistics.
+5. Protect shared driver state using a mutex.
+6. Expose driver information through ProcFS.
+7. Expose runtime attributes through SysFS.
+8. Integrate the driver into the Initramfs root filesystem.
+9. Automatically load the driver during system boot.
+10. Execute and validate the driver inside QEMU.
+11. Simulate NAND flash using `nandsim`.
+12. Access the simulated flash through the MTD subsystem.
+13. Mount and validate a JFFS2 filesystem.
+14. Perform a raw NAND dump and verify NAND/OOB information.
+15. Preserve reproducible logs for all major validation stages.
 
 ---
 
-## Project Goals
-
-The laboratory focuses on the following objectives:
-
-* Develop a Linux character device driver.
-* Build an ARMv7 kernel module using cross-compilation.
-* Register a character device with a static major number.
-* Implement `open`, `read`, `write`, and `release`.
-* Protect shared driver state using a kernel mutex.
-* Create a `/dev/lab2` device node.
-* Expose driver statistics through ProcFS.
-* Expose runtime attributes through SysFS.
-* Integrate the kernel module into an initramfs.
-* Boot and test the driver on QEMU ARM Cortex-A9.
-* Use kernel logging for driver debugging and verification.
-* Experiment with Linux MTD and NAND simulation.
-* Create and test a JFFS2 filesystem.
-* Verify NAND data using `nanddump`.
-* Maintain the project using milestone-based Git development.
-
----
-
-## Technology Stack
-
-| Component       | Version / Configuration       |
-| :-------------- | :---------------------------- |
-| Architecture    | ARMv7                         |
-| CPU             | ARM Cortex-A9                 |
-| Emulator        | QEMU `vexpress-a9`            |
-| Kernel          | Linux 5.15                    |
-| Kernel Module   | `lab2_driver.ko`              |
-| Device          | `/dev/lab2`                   |
-| Major Number    | `240`                         |
-| Minor Number    | `0`                           |
-| Buffer Size     | `1024 bytes`                  |
-| ProcFS          | `/proc/lab2_info`             |
-| SysFS           | `/sys/class/lab2_class/lab2/` |
-| Userspace       | BusyBox                       |
-| Root Filesystem | Initramfs                     |
-| Storage         | Linux MTD / NAND simulator    |
-| Filesystem      | JFFS2                         |
-| Cross Compiler  | `arm-linux-gnueabihf-`        |
-| Console         | `ttyAMA0`                     |
-| Memory          | `512 MB`                      |
-| SMP             | `2 CPUs`                      |
-| Host OS         | Ubuntu Linux                  |
-
----
-
-## Repository Structure
+## 4. Repository Structure
 
 ```text
 embedded-linux-lab2/
-│
 ├── driver/
+│   ├── lab2_driver.c
 │   ├── Makefile
-│   └── lab2_driver.c
+│   └── lab2_driver.ko
 │
 ├── rootfs/
 │   └── initramfs/
-│       ├── bin/
-│       ├── dev/
 │       ├── etc/
-│       ├── init
+│       │   ├── inittab
+│       │   └── init.d/
+│       │       └── rcS
+│       │
 │       ├── lib/
 │       │   └── modules/
 │       │       └── 5.15.0/
 │       │           └── lab2_driver.ko
-│       ├── proc/
-│       ├── root/
-│       ├── sbin/
-│       ├── sys/
-│       ├── tmp/
+│       │
 │       └── usr/
 │           ├── bin/
 │           │   ├── test_driver.sh
 │           │   └── test_procfs.sh
-│           └── sbin/
-│               ├── nanddump
-│               └── nandwrite
-│
-├── mtd/
-│
-├── configs/
+│           │
+│           └── etc/
+│               ├── inittab
+│               └── init.d/
+│                   └── rcS
 │
 ├── output/
+│   └── initramfs_lab2.cpio.gz
+│
+├── logs/
+│   ├── boot_log.txt
+│   ├── driver_test.txt
+│   ├── procfs_test.txt
+│   └── mtd_jffs2.txt
+│
+├── bao_cao/
+│   └── MSSV_Lab02_BaoCao.pdf
 │
 ├── .gitignore
 └── README.md
 ```
 
-Generated kernel-module metadata, temporary MTD data, QEMU runtime files, and compressed build outputs are excluded from version control where appropriate.
+---
+
+## 5. System Architecture
+
+```mermaid
+flowchart TB
+    HOST["Ubuntu Host<br/>Development Environment"]
+
+    TOOLCHAIN["ARM Cross Toolchain<br/>arm-linux-gnueabihf-gcc<br/>Linux Kernel 5.15"]
+
+    DRIVER["LAB-02 Character Device Driver<br/>lab2_driver.c → lab2_driver.ko"]
+
+    ROOTFS["Initramfs<br/>BusyBox RootFS<br/>Driver + Test Scripts"]
+
+    QEMU["QEMU VExpress-A9<br/>ARMv7 / Cortex-A9<br/>Linux 5.15"]
+
+    DEV["/dev/lab2<br/>Major 240 / Minor 0"]
+
+    PROC["ProcFS<br/>/proc/lab2_info"]
+
+    SYS["SysFS<br/>/sys/class/lab2_class/lab2"]
+
+    TEST["Test Scripts<br/>driver / procfs / sysfs"]
+
+    TOOLCHAIN --> DRIVER
+    DRIVER --> ROOTFS
+    ROOTFS --> QEMU
+
+    HOST --> TOOLCHAIN
+    HOST --> ROOTFS
+    HOST --> QEMU
+
+    QEMU --> DEV
+    QEMU --> PROC
+    QEMU --> SYS
+    QEMU --> TEST
+```
 
 ---
 
-# 1. LAB-02 Character Device Driver
+## 6. Driver Architecture
 
-The core component is:
+The LAB-02 driver provides a character-device interface between userspace applications and kernel-space driver logic.
 
-```text
-driver/lab2_driver.c
+```mermaid
+flowchart LR
+    USER["Userspace<br/>Applications / Test Scripts"]
+
+    DEV["/dev/lab2<br/>Character Device<br/>Major 240"]
+
+    DRIVER["lab2_driver<br/><br/>1024-byte Buffer<br/>open()<br/>read()<br/>write()<br/>release()<br/><br/>Mutex + Statistics"]
+
+    PROC["ProcFS<br/>/proc/lab2_info"]
+
+    SYS["SysFS<br/>buffer_len<br/>open_count<br/>last_data"]
+
+    KERNEL["Linux Kernel 5.15<br/>ARMv7"]
+
+    USER -->|"read / write"| DEV
+    DEV --> DRIVER
+
+    DRIVER --> PROC
+    DRIVER --> SYS
+    DRIVER --> KERNEL
 ```
 
-The driver registers a Linux character device with:
+---
+
+## 7. Character Device Driver
+
+The driver registers the following character device:
 
 ```text
-Device name : lab2
-Major       : 240
-Minor       : 0
-Buffer      : 1024 bytes
+Device name  : lab2
+Major number : 240
+Minor number : 0
+Buffer size  : 1024 bytes
+Device node  : /dev/lab2
 ```
 
-The corresponding userspace device is:
-
-```text
-/dev/lab2
-```
-
-### Supported Operations
-
-The driver implements the standard character-device callbacks:
+The driver implements:
 
 ```text
 open()
@@ -270,208 +216,153 @@ write()
 release()
 ```
 
-The driver maintains an internal buffer and runtime statistics.
-
-### Driver State
+The internal driver state contains:
 
 ```text
-Device buffer
-Buffer length
-Open count
-Last written data
+buffer
+buffer_len
+open_count
+last_data
 ```
 
-Access to shared state is protected using a kernel mutex.
+A mutex is used to protect shared driver state during concurrent access.
 
 ---
 
-# 2. Kernel Module
+## 8. ProcFS Interface
 
-The driver is built as an external Linux kernel module:
-
-```text
-lab2_driver.ko
-```
-
-The module is cross-compiled for ARM using:
-
-```text
-arm-linux-gnueabihf-
-```
-
-### Makefile
-
-```make
-KDIR := $(HOME)/embedded_lab1/kernel/linux-5.15
-ARCH := arm
-CROSS_COMPILE := arm-linux-gnueabihf-
-
-obj-m += lab2_driver.o
-```
-
-### Build
-
-```bash
-cd ~/embedded_lab2/driver
-
-make ARCH=arm \
-     CROSS_COMPILE=arm-linux-gnueabihf- \
-     -C ~/embedded_lab1/kernel/linux-5.15 \
-     M=$PWD \
-     modules
-```
-
-Verify the module:
-
-```bash
-file lab2_driver.ko
-```
-
-Expected architecture:
-
-```text
-ARM
-EABI5
-```
-
-The build-generated module remains outside the tracked `driver/` source tree, while the tested module integrated into the initramfs is retained as part of the runtime environment.
-
----
-
-# 3. Device Node
-
-The driver uses major number `240`.
-
-The device node is:
-
-```text
-/dev/lab2
-```
-
-Create manually when required:
-
-```bash
-mknod /dev/lab2 c 240 0
-chmod 666 /dev/lab2
-```
-
-Verify:
-
-```bash
-ls -l /dev/lab2
-```
-
-Expected:
-
-```text
-crw-rw-rw-  1 root  0  240, 0  /dev/lab2
-```
-
----
-
-# 4. ProcFS Interface
-
-The driver exposes runtime statistics through:
+The driver creates:
 
 ```text
 /proc/lab2_info
 ```
 
-The interface is implemented using the Linux ProcFS and sequence-file infrastructure.
+The ProcFS interface provides runtime information including:
 
-### Example
-
-```bash
-cat /proc/lab2_info
+```text
+Driver name
+Major number
+Buffer size
+Data length
+Open count
+Last data
 ```
 
-Initial state:
+Example:
 
 ```text
 LAB-02 Driver Statistics
 ======================
 Driver name   : lab2
-Student name  : ...
-Student ID    : ...
 Major number  : 240
 Buffer size   : 1024 bytes
-Data length   : 0 bytes
-Open count    : 0
+Data length   : 10 bytes
+Open count    : 8
+Last data     : [Message_3]
 ```
-
-After writing test data:
-
-```text
-Data length   : 30 bytes
-Open count    : 1
-Last data     : [Embedded Linux Lab2 Test Data
-]
-```
-
-ProcFS therefore provides a read-only diagnostic interface for the driver.
 
 ---
 
-# 5. SysFS Interface
+## 9. SysFS Interface
 
-The driver creates the class:
+The driver creates a SysFS class and device:
 
 ```text
 /sys/class/lab2_class/lab2/
 ```
 
-The runtime attributes include:
+The following attributes are provided:
 
 ```text
 buffer_len
 open_count
 last_data
-student_name
-student_id
 ```
 
-### Verification
-
-```bash
-SYSFS=/sys/class/lab2_class/lab2
-
-cat $SYSFS/buffer_len
-cat $SYSFS/open_count
-cat $SYSFS/last_data
-```
-
-Observed test result:
+Example:
 
 ```text
-buffer_len : 30
-open_count : 1
-last_data  : Embedded Linux Lab2 Test Data
+buffer_len=10
+open_count=8
+last_data=Message_3
 ```
-
-This provides direct visibility into the driver's internal state through the Linux device model.
 
 ---
 
-# 6. Initramfs Integration
+## 10. Driver Build
 
-The compiled module is integrated into the BusyBox initramfs:
+The driver is cross-compiled against the Linux 5.15 kernel.
 
-```text
-/lib/modules/5.15.0/lab2_driver.ko
+The Makefile uses:
+
+```make
+KDIR := $(HOME)/embedded_lab1/kernel/linux-5.15
+ARCH := arm
+CROSS_COMPILE := arm-linux-gnueabihf-
+obj-m += lab2_driver.o
 ```
 
-During system initialization, the startup script loads the module and prepares the device node.
+Build command:
+
+```bash
+cd ~/embedded_lab2/driver
+
+make -C ~/embedded_lab1/kernel/linux-5.15 \
+    ARCH=arm \
+    CROSS_COMPILE=arm-linux-gnueabihf- \
+    M=$PWD \
+    modules
+```
+
+The generated module is:
+
+```text
+driver/lab2_driver.ko
+```
+
+The final module is an ARM EABI5 kernel module built for Linux 5.15.
+
+---
+
+## 11. Initramfs Integration
+
+The kernel module is integrated into:
+
+```text
+rootfs/initramfs/lib/modules/5.15.0/lab2_driver.ko
+```
+
+The final Initramfs image is:
+
+```text
+output/initramfs_lab2.cpio.gz
+```
+
+The Initramfs contains:
+
+```text
+/etc/inittab
+/etc/init.d/rcS
+/lib/modules/5.15.0/lab2_driver.ko
+/usr/bin/test_driver.sh
+/usr/bin/test_procfs.sh
+```
+
+The startup script automatically loads the driver and creates the device node.
+
+---
+
+## 12. Boot Workflow
 
 ```mermaid
 flowchart LR
-
-    A["Linux Kernel"]
-    B["Initramfs"]
-    C["/sbin/init"]
-    D["rcS"]
-    E["insmod<br/>lab2_driver.ko"]
-    F["/dev/lab2"]
-    G["Ready for Testing"]
+    A["Source Code<br/>lab2_driver.c<br/>Makefile"]
+    B["Cross Compile<br/>ARM EABI5"]
+    C["Kernel Module<br/>lab2_driver.ko"]
+    D["Integrate<br/>Initramfs"]
+    E["Boot<br/>QEMU ARMv7"]
+    F["Runtime Test"]
+    G["Verification Logs"]
 
     A --> B
     B --> C
@@ -479,28 +370,19 @@ flowchart LR
     D --> E
     E --> F
     F --> G
-```
 
-This allows the driver to be available immediately after userspace initialization.
+    F --> F1["Character Device"]
+    F --> F2["ProcFS"]
+    F --> F3["SysFS"]
+    F --> F4["NAND / MTD"]
+    F --> F5["JFFS2"]
+```
 
 ---
 
-# 7. QEMU ARM Platform
+## 13. QEMU ARMv7 Environment
 
-The complete driver environment is tested using QEMU.
-
-### Platform
-
-```text
-Machine : vexpress-a9
-CPU     : Cortex-A9
-ISA     : ARMv7
-Memory  : 512 MB
-SMP     : 2 CPUs
-Console : ttyAMA0
-```
-
-### Boot Command
+The target system is executed using:
 
 ```bash
 qemu-system-arm \
@@ -515,59 +397,110 @@ qemu-system-arm \
   -append 'console=ttyAMA0,115200 rdinit=/sbin/init mem=512M'
 ```
 
-The kernel and Device Tree are reused from the Lab 1 ARMv7 environment.
-
----
-
-# 8. Driver Verification
-
-After booting QEMU:
-
-```bash
-lsmod | grep lab2
-```
-
-Expected:
+Target architecture:
 
 ```text
-lab2_driver  16384  0  - Live 0x7f000000 (O)
-```
-
-Verify the device:
-
-```bash
-ls -l /dev/lab2
-```
-
-Expected:
-
-```text
-crw-rw-rw-    1 root     0         240,   0 /dev/lab2
-```
-
-Verify the ProcFS interface:
-
-```bash
-cat /proc/lab2_info
-```
-
-Verify the SysFS interface:
-
-```bash
-find /sys/class/lab2_class/lab2 -maxdepth 1 -type f
+ARMv7
+Cortex-A9
+VExpress-A9
+Linux 5.15
+512 MB RAM
+2 CPUs
 ```
 
 ---
 
-# 9. Functional Test
+## 14. Device Node Verification
 
-The integrated test script is:
+After boot, the driver creates:
 
 ```text
-/usr/bin/test_procfs.sh
+/dev/lab2
 ```
 
-Execute:
+Expected device information:
+
+```text
+crw-rw-rw- 1 root 0 240,0 /dev/lab2
+```
+
+The major/minor numbers are:
+
+```text
+Major = 240
+Minor = 0
+```
+
+The driver can also create the device node manually:
+
+```bash
+mknod /dev/lab2 c 240 0
+```
+
+---
+
+## 15. Character Device Functional Test
+
+The driver test script performs:
+
+1. Module loading
+2. Module verification
+3. Device node verification
+4. Write operation
+5. Read operation
+6. Multiple write/read operations
+7. Kernel message verification
+
+Test command:
+
+```bash
+/usr/bin/test_driver.sh
+```
+
+The test successfully validates:
+
+```text
+Hello from userspace, LAB-02!
+
+Message_1
+Message_2
+Message_3
+```
+
+Final driver statistics:
+
+```text
+LAB-02 Driver Statistics
+======================
+Driver name   : lab2
+Major number  : 240
+Buffer size   : 1024 bytes
+Data length   : 10 bytes
+Open count    : 8
+Last data     : [Message_3]
+```
+
+Final SysFS state:
+
+```text
+buffer_len=10
+open_count=8
+last_data=Message_3
+```
+
+Result:
+
+```text
+=== Test PASSED ===
+```
+
+---
+
+## 16. ProcFS and SysFS Validation
+
+The ProcFS and SysFS test verifies that driver state is correctly exposed to userspace.
+
+Test command:
 
 ```bash
 /usr/bin/test_procfs.sh
@@ -576,13 +509,11 @@ Execute:
 The test performs:
 
 ```text
-1. Load the LAB-02 module
-2. Prepare /dev/lab2
-3. Read initial ProcFS statistics
-4. Write test data to /dev/lab2
-5. Read updated ProcFS statistics
-6. Inspect SysFS attributes
-7. Report the final test status
+1. Load driver
+2. Read /proc/lab2_info
+3. Write test data to /dev/lab2
+4. Read /proc/lab2_info again
+5. Read SysFS attributes
 ```
 
 Test data:
@@ -591,138 +522,76 @@ Test data:
 Embedded Linux Lab2 Test Data
 ```
 
-Observed result:
+Expected result:
+
+```text
+Data length   : 30 bytes
+Open count    : 1
+Last data     : [Embedded Linux Lab2 Test Data]
+```
+
+SysFS:
 
 ```text
 buffer_len : 30
 open_count : 1
 last_data  : Embedded Linux Lab2 Test Data
+```
 
+Result:
+
+```text
 === procfs/sysfs Test PASSED ===
 ```
 
 ---
 
-# 10. Kernel Log Verification
+## 17. NAND Simulator and MTD
 
-Driver activity can be monitored through the kernel ring buffer:
-
-```bash
-dmesg | grep lab2
-```
-
-Observed messages include:
-
-```text
-lab2_driver: initializing module
-lab2_driver: loaded, major=240
-lab2_driver: /proc/lab2_info created
-lab2_driver: device opened
-lab2_driver: received 30 bytes
-lab2_driver: device closed
-```
-
-This confirms the complete path:
-
-```text
-Userspace
-   ↓
-/dev/lab2
-   ↓
-Character Driver
-   ↓
-Kernel Buffer
-   ↓
-Driver Statistics
-   ↓
-ProcFS / SysFS
-```
-
----
-
-# 11. MTD and NAND Simulator
-
-The second part of the laboratory explores Linux's Memory Technology Device subsystem using the NAND simulator.
-
-The host-side workflow is:
-
-```mermaid
-flowchart LR
-
-    A["NAND Simulator"]
-    B["MTD Device"]
-    C["JFFS2"]
-    D["Mount"]
-    E["Write Files"]
-    F["Persistence Test"]
-    G["nanddump"]
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    B --> G
-```
-
-The NAND simulator was configured on the host Linux system.
-
-Example module configuration:
+The host-side NAND simulation uses the Linux NAND simulator:
 
 ```bash
-modprobe nandsim \
-    first_id_byte=0x20 \
-    second_id_byte=0x35
+sudo modprobe nandsim first_id_byte=0x20 second_id_byte=0x35
 ```
 
----
-
-# 12. MTD Layout
-
-The observed host MTD layout was:
+The MTD subsystem reports:
 
 ```text
-mtd0  32 MiB   BIOS
-mtd1  128 MiB  NAND simulator partition 0
+dev:    size   erasesize  name
+mtd0: 02000000 00001000 "BIOS"
+mtd1: 02000000 00004000 "NAND simulator partition 0"
 ```
 
-The JFFS2 experiment used the NAND simulator partition exposed as:
+The simulated NAND device is exposed as:
+
+```text
+/dev/mtd1
+/dev/mtd1ro
+```
+
+The block device used for filesystem testing is:
 
 ```text
 /dev/mtdblock1
 ```
 
-The exact MTD device number is environment-dependent because existing MTD devices can change the numbering.
-
-Inspect the current layout with:
-
-```bash
-cat /proc/mtd
-```
-
 ---
 
-# 13. JFFS2 Filesystem
+## 18. JFFS2 Filesystem Test
 
-The JFFS2 experiment covers:
+The simulated NAND partition is mounted using JFFS2:
 
-```text
-Filesystem creation
-NAND programming
-Mounting
-File creation
-File reading
-Persistence verification
-Raw NAND dumping
+```bash
+sudo mount -t jffs2 /dev/mtdblock1 /mnt/jffs2
 ```
 
-The filesystem was mounted at:
+Mounted filesystem:
 
 ```text
-/mnt/jffs2
+/dev/mtdblock1 on /mnt/jffs2 type jffs2 (rw,relatime)
 ```
 
-Example files:
+The filesystem contains:
 
 ```text
 hello.txt
@@ -730,277 +599,367 @@ info.txt
 boot.log
 ```
 
-Example contents:
+File contents:
 
 ```text
 hello.txt
+-----------
 Hello from JFFS2!
 ```
 
 ```text
 info.txt
+-----------
 Embedded Linux Lab2
 ```
 
-JFFS2 is particularly suitable for raw flash devices because it is designed around erase blocks, wear considerations, and flash-specific behavior.
+```text
+boot.log
+-----------
+Mon Oct  5 09:56:42 AM +07 2026
+```
+
+Result:
+
+```text
+=== JFFS2 TEST PASSED ===
+```
 
 ---
 
-# 14. NAND Dump Verification
+## 19. NAND Dump Verification
 
-Raw NAND data was dumped using:
+A raw NAND dump was performed using:
 
 ```bash
-nanddump
+sudo nanddump -o -l 512 /dev/mtd1
 ```
 
-The resulting temporary dump was:
+The NAND simulator reported:
+
+```text
+ECC failed: 0
+ECC corrected: 0
+Number of bad blocks: 0
+Number of bbt blocks: 0
+
+Block size 16384
+Page size 512
+OOB size 16
+```
+
+The dump contains:
+
+```text
+512 bytes NAND data
++
+16 bytes OOB data
+=
+528 bytes
+```
+
+Dump file:
 
 ```text
 /tmp/dump.bin
 ```
 
-Observed NAND characteristics:
+Verified size:
 
-| Parameter    | Value       |
-| :----------- | :---------- |
-| Erase Block  | 16384 bytes |
-| Page Size    | 512 bytes   |
-| OOB Size     | 16 bytes    |
-| ECC Failures | 0           |
-| Bad Blocks   | 0           |
-
-The dump can be inspected with:
-
-```bash
-hexdump -C /tmp/dump.bin | head
+```text
+-rw-r--r-- 1 root root 528 /tmp/dump.bin
 ```
 
-Temporary NAND dumps and generated filesystem images are excluded from Git.
-
 ---
 
-# 15. Verification Summary
-
-| Component                | Result |
-| :----------------------- | :----- |
-| ARMv7 cross-compilation  | PASS   |
-| Kernel module build      | PASS   |
-| `lab2_driver.ko`         | PASS   |
-| Module loading           | PASS   |
-| Character device         | PASS   |
-| `/dev/lab2`              | PASS   |
-| Major number `240`       | PASS   |
-| ProcFS                   | PASS   |
-| SysFS                    | PASS   |
-| Character-device write   | PASS   |
-| Driver statistics        | PASS   |
-| Kernel logging           | PASS   |
-| QEMU ARMv7 boot          | PASS   |
-| BusyBox initramfs        | PASS   |
-| NAND simulator           | PASS   |
-| JFFS2                    | PASS   |
-| NAND write               | PASS   |
-| Persistence verification | PASS   |
-| NAND dump                | PASS   |
-| ECC failures             | `0`    |
-| Bad blocks               | `0`    |
-
----
-
-# 16. Git Development
-
-The repository uses milestone-based Git development to keep the project history clean and traceable.
+## 20. Verification Flow
 
 ```mermaid
-flowchart LR
+flowchart TD
+    START["LAB-02 System"]
 
-    M1["Milestone 1<br/><b>Character Device Driver</b>"]
-    M2["Milestone 2<br/><b>ProcFS + SysFS Verification</b>"]
+    BOOT["QEMU Boot"]
+    MOD["Load lab2_driver.ko"]
+    DEV["Verify /dev/lab2"]
 
-    M1 --> M2
-```
+    CHAR["Character Device Test"]
+    PROC["ProcFS Test"]
+    SYS["SysFS Test"]
 
-### Milestone 1
+    NAND["NAND Simulator"]
+    MTD["MTD Device"]
+    JFFS["JFFS2 Mount"]
+    DUMP["NAND Dump"]
 
-```text
-8afb6b2
-Milestone 1: Implement LAB-02 character device driver
-```
+    LOG["Store Verification Logs"]
 
-Initial LAB-02 driver implementation, build configuration, root filesystem integration, and supporting userspace environment.
+    PASS["LAB-02 VALIDATED"]
 
-### Milestone 2
+    START --> BOOT
+    BOOT --> MOD
+    MOD --> DEV
 
-```text
-d464358
-Milestone 2: Verify ProcFS and SysFS interfaces
-```
+    DEV --> CHAR
+    DEV --> PROC
+    DEV --> SYS
 
-Driver correction and verification of ProcFS, SysFS, character-device functionality, and QEMU runtime behavior.
+    CHAR --> LOG
+    PROC --> LOG
+    SYS --> LOG
 
-The repository intentionally keeps these as the two primary development milestones rather than creating artificial commits for work that was not separately versioned.
+    BOOT --> NAND
+    NAND --> MTD
+    MTD --> JFFS
+    MTD --> DUMP
 
----
+    JFFS --> LOG
+    DUMP --> LOG
 
-# 17. Build Environment
-
-### Host Operating System
-
-```text
-Ubuntu 26.04 LTS
-64-bit
-```
-
-### Cross Compiler
-
-```bash
-arm-linux-gnueabihf-gcc --version
-```
-
-### QEMU
-
-```bash
-qemu-system-arm --version
-```
-
-### Kernel
-
-```text
-Linux 5.15.0
-```
-
-### Architecture
-
-```text
-ARMv7 / ARM EABI
-```
-
-### Main Development Tools
-
-```text
-gcc
-make
-binutils
-qemu-system-arm
-busybox
-cpio
-mtd-utils
+    LOG --> PASS
 ```
 
 ---
 
-# 18. Repository Hygiene
+## 21. Test Evidence
 
-The repository uses `.gitignore` to keep generated and temporary files outside version control.
-
-Ignored content includes:
+The repository stores the main validation evidence under:
 
 ```text
-Kernel module build artifacts
-Module.symvers
-modules.order
+logs/
+├── boot_log.txt
+├── driver_test.txt
+├── procfs_test.txt
+└── mtd_jffs2.txt
+```
+
+### Boot Log
+
+```text
+logs/boot_log.txt
+```
+
+Contains the complete QEMU boot and runtime verification session.
+
+### Character Device Test
+
+```text
+logs/driver_test.txt
+```
+
+Contains:
+
+```text
+Module loading
+Device node verification
+Write/read tests
+Multiple write/read tests
+dmesg verification
+ProcFS verification
+SysFS verification
+```
+
+Final result:
+
+```text
+=== Test PASSED ===
+```
+
+### ProcFS / SysFS Test
+
+```text
+logs/procfs_test.txt
+```
+
+Contains the validation of:
+
+```text
+/proc/lab2_info
+
+/sys/class/lab2_class/lab2/
+```
+
+Final result:
+
+```text
+=== procfs/sysfs Test PASSED ===
+```
+
+### MTD / JFFS2 Test
+
+```text
+logs/mtd_jffs2.txt
+```
+
+Contains:
+
+```text
+NAND simulator information
+MTD device information
+JFFS2 mount
+JFFS2 file contents
+NAND dump information
+ECC verification
+Bad-block verification
+```
+
+Final result:
+
+```text
+=== JFFS2 TEST PASSED ===
+```
+
+---
+
+## 22. Verification Summary
+
+| Component                      | Status |
+| ------------------------------ | ------ |
+| ARMv7 target                   | PASS   |
+| Linux 5.15                     | PASS   |
+| QEMU VExpress-A9               | PASS   |
+| Character device driver        | PASS   |
+| `/dev/lab2`                    | PASS   |
+| Major 240 / Minor 0            | PASS   |
+| Read / Write operations        | PASS   |
+| Multiple read/write operations | PASS   |
+| Mutex-protected driver state   | PASS   |
+| ProcFS                         | PASS   |
+| SysFS                          | PASS   |
+| Initramfs integration          | PASS   |
+| Automatic module loading       | PASS   |
+| NAND simulator                 | PASS   |
+| MTD                            | PASS   |
+| JFFS2                          | PASS   |
+| NAND dump                      | PASS   |
+| ECC errors                     | 0      |
+| Bad blocks                     | 0      |
+
+---
+
+## 23. Repository Hygiene
+
+Build-generated kernel module artifacts are excluded using `.gitignore`.
+
+Examples:
+
+```text
 *.o
+*.mod
 *.mod.c
 *.mod.o
-QEMU runtime files
-Compressed temporary outputs
-MTD images
-NAND dump files
-Temporary logs
+Module.symvers
+.*.cmd
 ```
 
-The tested module integrated into the initramfs is intentionally retained:
+The final deliverables are intentionally preserved:
 
 ```text
+driver/lab2_driver.ko
 rootfs/initramfs/lib/modules/5.15.0/lab2_driver.ko
+output/initramfs_lab2.cpio.gz
+logs/*.txt
 ```
 
-This allows the repository to preserve the exact module used by the tested runtime environment.
+This keeps the repository focused on source code, final binaries, reproducible rootfs content and verification evidence.
 
 ---
 
-# 19. Learning Outcomes
+## 24. Reproducibility Flow
 
-This laboratory provides practical experience with:
+The project can be reproduced using the following high-level workflow:
 
 ```text
-Linux Kernel Modules
+Linux Kernel 5.15
         │
-        ├── Character Devices
-        ├── Device Nodes
-        ├── File Operations
-        ├── Kernel Mutex
+        ▼
+ARM Cross Compilation
+        │
+        ▼
+Build lab2_driver.ko
+        │
+        ▼
+Copy Driver into Initramfs
+        │
+        ▼
+Create initramfs_lab2.cpio.gz
+        │
+        ▼
+Boot QEMU VExpress-A9
+        │
+        ▼
+Load Driver
+        │
+        ├── /dev/lab2
+        ├── /proc/lab2_info
+        └── /sys/class/lab2_class/lab2/
+        │
+        ▼
+Run Driver Tests
+        │
+        ▼
+NAND Simulator
+        │
+        ▼
+MTD
+        │
+        ▼
+JFFS2
+        │
+        ▼
+NAND Dump
+        │
+        ▼
+Verification Logs
+```
+
+---
+
+## 25. Final Result
+
+The Embedded Linux Lab 2 implementation successfully demonstrates a complete Embedded Linux driver workflow from kernel-module development to runtime validation.
+
+The final system provides:
+
+```text
+ARMv7 Embedded Linux
+        │
+        ├── Linux 5.15
+        ├── QEMU VExpress-A9
+        ├── BusyBox Initramfs
+        ├── LAB-02 Character Device
+        ├── /dev/lab2
         ├── ProcFS
         ├── SysFS
-        ├── Kernel Logging
-        ├── Initramfs
-        ├── BusyBox
-        ├── QEMU ARM Emulation
+        ├── NAND Simulator
         ├── MTD
-        ├── NAND Simulation
-        └── JFFS2
+        ├── JFFS2
+        └── NAND Dump Verification
 ```
 
-The project demonstrates how a userspace application can interact with a custom Linux kernel driver and how kernel state can be exposed through standard Linux virtual filesystems.
-
----
-
-# 20. Lab 1 → Lab 2
-
-Lab 2 builds directly on the embedded Linux environment established in Lab 1.
-
-```mermaid
-flowchart LR
-
-    A["Embedded Linux Lab 1<br/><br/>Kernel<br/>U-Boot<br/>BusyBox<br/>Initramfs<br/>QEMU"]
-    B["Embedded Linux Lab 2<br/><br/>Kernel Module<br/>Character Device<br/>ProcFS<br/>SysFS<br/>MTD / JFFS2"]
-
-    A --> B
-```
-
-### Lab 1
+All major components were built, booted and validated successfully.
 
 ```text
-Boot the Embedded Linux System
+╔══════════════════════════════════════════════╗
+║          EMBEDDED LINUX LAB 2               ║
+║                                              ║
+║   Character Driver       : PASS              ║
+║   ProcFS / SysFS         : PASS              ║
+║   Initramfs              : PASS              ║
+║   QEMU ARMv7             : PASS              ║
+║   NAND / MTD             : PASS              ║
+║   JFFS2                  : PASS              ║
+║   NAND Dump              : PASS              ║
+║                                              ║
+║             STATUS: COMPLETED               ║
+╚══════════════════════════════════════════════╝
 ```
-
-### Lab 2
-
-```text
-Develop and interact with the Linux Kernel
-```
-
-Together, the two laboratories form a progression from building an Embedded Linux platform to developing software directly inside the Linux kernel.
 
 ---
 
 ## Author
 
-<p align="center">
-  <b>Hoang Trung Hai</b><br>
-  IC Design Student · FPT University
-</p>
+**Hoang Trung Hai**
 
-<p align="center">
-  <a href="https://github.com/BlackWater006">
-    <img src="https://img.shields.io/badge/GitHub-BlackWater006-black?style=for-the-badge&logo=github" alt="GitHub">
-  </a>
-</p>
+**FPT University — IC Design**
 
----
-
-## License
-
-This repository is an academic Embedded Linux laboratory project created for educational purposes.
-
-The project integrates and interacts with open-source software including the Linux Kernel, BusyBox, QEMU, and MTD utilities. Each third-party component remains subject to its respective license.
-
-See the repository license file for the applicable project terms.
-
----
-
-<p align="center">
-  <b>Embedded Linux Lab 2</b><br>
-  ARMv7 · Linux Kernel 5.15 · QEMU · Character Driver · ProcFS · SysFS · MTD · JFFS2
-</p>
+Embedded Linux Lab 2
