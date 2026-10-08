@@ -120,8 +120,6 @@ embedded-linux-lab2/
 │   ├── procfs_test.txt
 │   └── mtd_jffs2.txt
 │
-├── bao_cao/
-│   └── MSSV_Lab02_BaoCao.pdf
 │
 ├── .gitignore
 └── README.md
