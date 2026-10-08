@@ -938,7 +938,7 @@ All major components were built, booted and validated successfully.
 
 ```text
 ╔══════════════════════════════════════════════╗
-║          EMBEDDED LINUX LAB 2               ║
+║          EMBEDDED LINUX LAB 2                ║
 ║                                              ║
 ║   Character Driver       : PASS              ║
 ║   ProcFS / SysFS         : PASS              ║
@@ -948,7 +948,7 @@ All major components were built, booted and validated successfully.
 ║   JFFS2                  : PASS              ║
 ║   NAND Dump              : PASS              ║
 ║                                              ║
-║             STATUS: COMPLETED               ║
+║             STATUS: COMPLETED                ║
 ╚══════════════════════════════════════════════╝
 ```
 
